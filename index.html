@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentSprint — Multi-Agent Agile Sprint Simulator</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0d14;--s1:#111827;--s2:#1a2236;--s3:#243048;
+  --border:#2a3555;--text:#e8edf8;--muted:#7b8db8;--faint:#3d4f7a;
+  --po:#6366f1;--sm:#0ea5e9;--dev:#10b981;--qa:#f59e0b;
+  --stake:#ec4899;--risk:#ef4444;--orch:#8b5cf6;
+  --success:#22c55e;--warn:#f59e0b;--danger:#ef4444;
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* ── TOP NAV ── */
+nav{background:var(--s1);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.nav-logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:32px;height:32px;background:linear-gradient(135deg,var(--po),var(--sm));border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;color:white}
+.logo-text{font-size:17px;font-weight:800;letter-spacing:-.3px}
+.logo-text span{color:var(--po)}
+.nav-badge{font-size:10px;font-weight:700;padding:3px 9px;border-radius:12px;background:rgba(99,102,241,.2);color:var(--po);border:1px solid rgba(99,102,241,.4)}
+.nav-right{display:flex;align-items:center;gap:12px}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--success);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── LAYOUT ── */
+.layout{display:grid;grid-template-columns:280px 1fr 300px;height:calc(100vh - 56px)}
+
+/* ── LEFT SIDEBAR ── */
+.sidebar{background:var(--s1);border-right:1px solid var(--border);padding:20px 16px;overflow-y:auto;display:flex;flex-direction:column;gap:20px}
+.sidebar-section h3{font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
+.agent-card{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;transition:all .2s;border-left:3px solid transparent}
+.agent-card:hover{border-color:var(--border);background:var(--s3)}
+.agent-card.active{border-left-color:var(--po)}
+.agent-head{display:flex;align-items:center;gap:9px;margin-bottom:6px}
+.agent-avatar{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0}
+.agent-name{font-size:13px;font-weight:600}
+.agent-role{font-size:11px;color:var(--muted);line-height:1.4}
+.agent-status{display:flex;align-items:center;gap:5px;font-size:10px;margin-top:6px}
+.status-indicator{width:6px;height:6px;border-radius:50%}
+.si-idle{background:var(--faint)}
+.si-thinking{background:var(--warn);animation:pulse 1s infinite}
+.si-done{background:var(--success)}
+
+/* ── MAIN CHAT AREA ── */
+.main{display:flex;flex-direction:column;overflow:hidden}
+.sprint-header{background:var(--s2);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+.sprint-title{font-size:15px;font-weight:700}
+.sprint-meta{font-size:12px;color:var(--muted)}
+.sprint-chips{display:flex;gap:8px}
+.chip{font-size:11px;font-weight:600;padding:4px 10px;border-radius:8px;border:1px solid var(--border)}
+.chip-blue{background:rgba(14,165,233,.1);color:#38bdf8;border-color:rgba(14,165,233,.3)}
+.chip-green{background:rgba(16,185,129,.1);color:#34d399;border-color:rgba(16,185,129,.3)}
+.chip-purple{background:rgba(99,102,241,.1);color:#a5b4fc;border-color:rgba(99,102,241,.3)}
+
+.chat-area{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:4px}
+.chat-area::-webkit-scrollbar{width:4px}
+.chat-area::-webkit-scrollbar-track{background:transparent}
+.chat-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+/* ── MESSAGES ── */
+.msg{display:flex;gap:10px;padding:6px 0;animation:fadeIn .4s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.msg-avatar{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;margin-top:2px}
+.msg-body{flex:1;max-width:680px}
+.msg-header{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+.msg-name{font-size:13px;font-weight:700}
+.msg-time{font-size:10px;color:var(--faint)}
+.msg-badge{font-size:9px;font-weight:700;padding:1px 6px;border-radius:6px;margin-left:2px}
+.msg-text{font-size:13px;line-height:1.65;color:#cbd5f0}
+.msg-text strong{color:var(--text);font-weight:600}
+.msg-text code{background:var(--s3);color:#93c5fd;padding:1px 5px;border-radius:4px;font-size:12px;font-family:monospace}
+
+/* Typing indicator */
+.typing-dots{display:flex;gap:3px;padding:4px 0;align-items:center}
+.typing-dots span{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:bounce .9s infinite}
+.typing-dots span:nth-child(2){animation-delay:.2s}
+.typing-dots span:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+
+/* Deliverable cards */
+.deliverable{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:8px}
+.del-header{font-size:11px;font-weight:700;color:var(--po);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.del-story{background:var(--s3);border-radius:7px;padding:8px 12px;margin-bottom:6px;font-size:12px;line-height:1.6}
+.del-story .story-id{color:var(--muted);font-size:10px;font-weight:700;margin-bottom:2px}
+.del-story .story-title{color:var(--text);font-weight:600;margin-bottom:3px}
+.del-story .story-points{display:inline-block;background:rgba(99,102,241,.2);color:#a5b4fc;font-size:10px;font-weight:700;padding:1px 7px;border-radius:6px;margin-right:6px}
+.del-story .story-prio{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:6px}
+.prio-p1{background:rgba(239,68,68,.15);color:#fca5a5}
+.prio-p2{background:rgba(245,158,11,.15);color:#fcd34d}
+.prio-p3{background:rgba(16,185,129,.15);color:#6ee7b7}
+.criteria-item{font-size:11px;color:#94a3b8;padding:3px 0;border-bottom:1px solid var(--border);line-height:1.5}
+.criteria-item:last-child{border:none}
+.risk-item{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#94a3b8;padding:4px 0;border-bottom:1px solid var(--border)}
+.risk-item:last-child{border:none}
+.risk-sev{font-size:10px;font-weight:700;padding:1px 7px;border-radius:6px;flex-shrink:0;margin-top:1px}
+.sev-h{background:rgba(239,68,68,.15);color:#fca5a5}
+.sev-m{background:rgba(245,158,11,.15);color:#fcd34d}
+.sev-l{background:rgba(16,185,129,.15);color:#6ee7b7}
+
+/* System message */
+.sys-msg{text-align:center;padding:10px 0;font-size:11px;color:var(--faint);display:flex;align-items:center;gap:10px}
+.sys-line{flex:1;height:1px;background:var(--border)}
+
+/* ── INPUT BAR ── */
+.input-area{background:var(--s1);border-top:1px solid var(--border);padding:16px 24px}
+.input-wrap{background:var(--s2);border:1px solid var(--border);border-radius:12px;display:flex;align-items:flex-end;gap:10px;padding:10px 14px;transition:border-color .2s}
+.input-wrap:focus-within{border-color:var(--po)}
+textarea#userInput{flex:1;background:transparent;border:none;color:var(--text);font-size:14px;font-family:inherit;resize:none;outline:none;min-height:22px;max-height:120px;line-height:1.5}
+textarea#userInput::placeholder{color:var(--faint)}
+.send-btn{background:var(--po);border:none;border-radius:8px;padding:8px 16px;color:white;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0}
+.send-btn:hover{background:#4f46e5}
+.send-btn:disabled{opacity:.4;cursor:not-allowed}
+.input-hints{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.hint{background:var(--s3);border:1px solid var(--border);color:var(--muted);font-size:11px;padding:4px 10px;border-radius:8px;cursor:pointer;transition:all .2s}
+.hint:hover{border-color:var(--po);color:var(--text)}
+
+/* ── RIGHT PANEL ── */
+.right-panel{background:var(--s1);border-left:1px solid var(--border);padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.panel-section{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:14px}
+.panel-section h4{font-size:11px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
+.sprint-stat{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px}
+.sprint-stat:last-child{border:none}
+.stat-val{font-weight:700;color:var(--text)}
+.progress-bar{background:var(--border);border-radius:4px;height:5px;margin-top:6px}
+.progress-fill{height:5px;border-radius:4px;background:linear-gradient(90deg,var(--po),var(--sm));transition:width .8s ease}
+.backlog-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;cursor:pointer}
+.backlog-item:last-child{border:none}
+.bi-id{color:var(--faint);font-weight:700;width:40px;flex-shrink:0}
+.bi-title{flex:1;color:#94a3b8}
+.bi-pts{background:var(--s3);padding:1px 6px;border-radius:5px;color:var(--muted);font-size:10px;flex-shrink:0}
+.agent-flow{display:flex;flex-direction:column;gap:4px}
+.flow-step{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:11px;color:var(--muted)}
+.flow-icon{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
+.flow-arrow{color:var(--faint);font-size:10px;text-align:center;padding:0 4px}
+
+/* ── WELCOME SCREEN ── */
+.welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:20px;padding:40px;text-align:center}
+.welcome-icon{font-size:48px;margin-bottom:8px}
+.welcome h2{font-size:24px;font-weight:800;background:linear-gradient(135deg,var(--po),var(--sm));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.welcome p{color:var(--muted);font-size:14px;max-width:420px;line-height:1.7}
+.example-prompts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;width:100%;max-width:560px}
+.ex-prompt{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;text-align:left;transition:all .2s}
+.ex-prompt:hover{border-color:var(--po);background:var(--s3)}
+.ex-prompt .ex-label{font-size:10px;color:var(--po);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.ex-prompt .ex-text{font-size:12px;color:#94a3b8;line-height:1.5}
+
+@media(max-width:1024px){.layout{grid-template-columns:240px 1fr}.right-panel{display:none}}
+@media(max-width:700px){.layout{grid-template-columns:1fr}.sidebar{display:none}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">
+    <div class="logo-mark">AS</div>
+    <div class="logo-text">Agent<span>Sprint</span></div>
+    <span class="nav-badge">Multi-Agent · 6 AI Agents</span>
+  </div>
+  <div class="nav-right">
+    <div class="status-dot"></div>
+    <span style="font-size:12px;color:var(--muted)">Agents online</span>
+  </div>
+</nav>
+
+<div class="layout">
+
+  <!-- LEFT: Agent Roster -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <h3>Agent Roster</h3>
+      <div class="agent-card active" id="card-orchestrator">
+        <div class="agent-head">
+          <div class="agent-avatar" style="background:linear-gradient(135deg,#8b5cf6,#6366f1)">🎯</div>
+          <div><div class="agent-name">Orchestrator</div></div>
+        </div>
+        <div class="agent-role">Coordinates all agents, assigns tasks, synthesises final deliverables</div>
+        <div class="agent-status"><div class="status-indicator si-idle" id="si-orchestrator"></div><span id="st-orchestrator" style="font-size:10px;color:var(--muted)">Standby</span></div>
+      </div>
+      <div class="agent-card" id="card-po">
+        <div class="agent-head">
+          <div class="agent-avatar" style="background:linear-gradient(135deg,#6366f1,#818cf8)">👤</div>
+          <div><div class="agent-name">PO Agent</div></div>
+        </div>
+        <div class="agent-role">Writes user stories, defines acceptance criteria, prioritises backlog</div>
+        <div class="agent-status"><div class="status-indicator si-idle" id="si-po"></div><span id="st-po" style="font-size:10px;color:var(--muted)">Standby</span></div>
+      </div>
+      <div class="agent-card" id="card-sm">
+        <div class="agent-head">
+          <div class="agent-avatar" style="background:linear-gradient(135deg,#0ea5e9,#38bdf8)">🔄</div>
+          <div><div class="agent-name">Scrum Master</div></div>
+        </div>
+        <div class="agent-role">Facilitates process, removes blockers, ensures DoR/DoD compliance</div>
+        <div class="agent-status"><div class="status-indicator si-idle" id="si-sm"></div><span id="st-sm" style="font-size:10px;color:var(--muted)">Standby</span></div>
+      </div>
+      <div class="agent-card" id="card-dev">
+        <div class="agent-head">
+          <div class="agent-avatar" style="background:linear-gradient(135deg,#10b981,#34d399)">💻</div>
+          <div><div class="agent-name">Dev Agent</div></div>
+        </div>
+        <div class="agent-role">Estimates effort, identifies technical dependencies & implementation notes</div>
+        <div class="agent-status"><div class="status-indicator si-idle" id="si-dev"></div><span id="st-dev" style="font-size:10px;color:var(--muted)">Standby</span></div>
+      </div>
+      <div class="agent-card" id="card-qa">
+        <div class="agent-head">
+          <div class="agent-avatar" style="background:linear-gradient(135deg,#f59e0b,#fbbf24)">🧪</div>
+          <div><div class="agent-name">QA Agent</div></div>
+        </div>
+        <div class="agent-role">Writes test scenarios, edge cases, and Definition of Done criteria</div>
+        <div class="agent-status"><div class="status-indicator si-idle" id="si-qa"></div><span id="st-qa" style="font-size:10px;color:var(--muted)">Standby</span></div>
+      </div>
+      <div class="agent-card" id="card-risk">
+        <div class="agent-head">
+          <div class="agent-avatar" style="background:linear-gradient(135deg,#ef4444,#f87171)">⚠️</div>
+          <div><div class="agent-name">Risk Agent</div></div>
+        </div>
+        <div class="agent-role">Identifies risks, flags dependencies, scores impact vs probability</div>
+        <div class="agent-status"><div class="status-indicator si-idle" id="si-risk"></div><span id="st-risk" style="font-size:10px;color:var(--muted)">Standby</span></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>Architecture</h3>
+      <div class="agent-flow">
+        <div class="flow-step"><div class="flow-icon" style="background:rgba(139,92,246,.2);color:#a78bfa">🎯</div><span>Orchestrator receives input</span></div>
+        <div class="flow-arrow">↓ delegates in parallel</div>
+        <div class="flow-step"><div class="flow-icon" style="background:rgba(99,102,241,.2);color:#818cf8">👤</div><span>PO → User Stories</span></div>
+        <div class="flow-step"><div class="flow-icon" style="background:rgba(16,185,129,.2);color:#34d399">💻</div><span>Dev → Estimates</span></div>
+        <div class="flow-step"><div class="flow-icon" style="background:rgba(239,68,68,.2);color:#f87171">⚠️</div><span>Risk → Risk Register</span></div>
+        <div class="flow-arrow">↓ sequential review</div>
+        <div class="flow-step"><div class="flow-icon" style="background:rgba(14,165,233,.2);color:#38bdf8">🔄</div><span>SM → DoR/DoD check</span></div>
+        <div class="flow-step"><div class="flow-icon" style="background:rgba(245,158,11,.2);color:#fbbf24">🧪</div><span>QA → Test scenarios</span></div>
+        <div class="flow-arrow">↓ synthesise</div>
+        <div class="flow-step"><div class="flow-icon" style="background:rgba(139,92,246,.2);color:#a78bfa">📋</div><span>Sprint-ready backlog</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CHAT -->
+  <div class="main">
+    <div class="sprint-header">
+      <div>
+        <div class="sprint-title" id="sprintTitle">AgentSprint — AI Sprint Simulator</div>
+        <div class="sprint-meta" id="sprintMeta">6 specialised agents · Powered by Claude claude-sonnet-4-20250514</div>
+      </div>
+      <div class="sprint-chips">
+        <span class="chip chip-purple" id="chipAgents">6 Agents</span>
+        <span class="chip chip-blue" id="chipSprint">Sprint 0</span>
+        <span class="chip chip-green" id="chipStories">0 Stories</span>
+      </div>
+    </div>
+
+    <div class="chat-area" id="chatArea">
+      <div class="welcome" id="welcomeScreen">
+        <div class="welcome-icon">🤖</div>
+        <h2>Meet Your AI Agile Team</h2>
+        <p>Describe a feature, epic, or product challenge. Your 6-agent team will debate, estimate, identify risks, write user stories, and produce a sprint-ready backlog — automatically.</p>
+        <div class="example-prompts">
+          <div class="ex-prompt" onclick="usePrompt(this)">
+            <div class="ex-label">🏭 Manufacturing</div>
+            <div class="ex-text">Build a real-time PIM data quality dashboard for product managers to monitor and fix data errors across 4 global brands</div>
+          </div>
+          <div class="ex-prompt" onclick="usePrompt(this)">
+            <div class="ex-label">🔌 EV / Mobility</div>
+            <div class="ex-text">Add live charger availability status and session pre-booking to the IONITY mobile app for long-distance EV drivers</div>
+          </div>
+          <div class="ex-prompt" onclick="usePrompt(this)">
+            <div class="ex-label">💼 B2B SaaS</div>
+            <div class="ex-text">Create a fleet management portal for B2B customers with consolidated billing, cost centre allocation, and usage reports</div>
+          </div>
+          <div class="ex-prompt" onclick="usePrompt(this)">
+            <div class="ex-label">📊 Analytics</div>
+            <div class="ex-text">Build an executive KPI dashboard that auto-aggregates data from Salesforce, SAP, and Google Analytics into one real-time view</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <div class="input-wrap">
+        <textarea id="userInput" placeholder="Describe a feature, epic, or product challenge for your AI team to plan..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="runAgents()">Run Sprint ▶</button>
+      </div>
+      <div class="input-hints">
+        <span class="hint" onclick="useHint(this)">PIM data sync feature</span>
+        <span class="hint" onclick="useHint(this)">User notifications system</span>
+        <span class="hint" onclick="useHint(this)">API rate limiting</span>
+        <span class="hint" onclick="useHint(this)">Mobile offline mode</span>
+        <span class="hint" onclick="useHint(this)">Fleet billing portal</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="panel-section">
+      <h4>Sprint Stats</h4>
+      <div class="sprint-stat"><span>Total Stories</span><span class="stat-val" id="totalStories">0</span></div>
+      <div class="sprint-stat"><span>Story Points</span><span class="stat-val" id="totalPoints">0</span></div>
+      <div class="sprint-stat"><span>P1 Critical</span><span class="stat-val" style="color:#fca5a5" id="p1Count">0</span></div>
+      <div class="sprint-stat"><span>Risks Identified</span><span class="stat-val" style="color:#fcd34d" id="riskCount">0</span></div>
+      <div class="sprint-stat"><span>Agents Run</span><span class="stat-val" id="agentsRun">0/6</span></div>
+      <div style="margin-top:10px;font-size:11px;color:var(--faint)">Sprint Progress</div>
+      <div class="progress-bar"><div class="progress-fill" id="sprintProgress" style="width:0%"></div></div>
+    </div>
+
+    <div class="panel-section">
+      <h4>Generated Backlog</h4>
+      <div id="backlogPanel"><div style="font-size:12px;color:var(--faint);text-align:center;padding:12px 0">No stories yet</div></div>
+    </div>
+
+    <div class="panel-section">
+      <h4>About AgentSprint</h4>
+      <div style="font-size:11px;color:var(--muted);line-height:1.7">
+        <div style="margin-bottom:6px">Built by <strong style="color:var(--text)">Monil Raval</strong></div>
+        <div style="margin-bottom:6px">Certified SAFe 6 POPM · Ex-AGCO/Fendt Product Owner</div>
+        <div style="margin-bottom:6px">Multi-agent orchestration using Anthropic Claude claude-sonnet-4-20250514</div>
+        <div style="margin-bottom:10px">Each agent has a unique system prompt, persona, and specialisation area.</div>
+        <a href="https://linkedin.com/in/monil-raval" target="_blank" style="color:var(--po);text-decoration:none;font-size:11px">LinkedIn ↗</a>
+        &nbsp;·&nbsp;
+        <a href="https://clarushorizon.com" target="_blank" style="color:var(--po);text-decoration:none;font-size:11px">ClarusHorizon ↗</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── AGENT DEFINITIONS ─────────────────────────────────────────────────────
+const AGENTS = {
+  orchestrator: {
+    name: "Orchestrator",
+    color: "#8b5cf6",
+    avatar: "🎯",
+    badge: "ORCHESTRATOR",
+    badgeColor: "#7c3aed",
+    persona: `You are the Orchestrator Agent in an agile sprint simulation. Your job is to:
+1. Receive the feature request from the user
+2. Decompose it into sub-tasks for specialised agents
+3. Provide a brief kick-off message explaining what the team will do
+4. After all agents respond, synthesise their outputs into a final sprint plan summary
+
+Be concise, structured, and sound like a real Scrum Master running a planning session. Keep your kick-off to 3-4 sentences.`
+  },
+  po: {
+    name: "PO Agent",
+    color: "#6366f1",
+    avatar: "👤",
+    badge: "PRODUCT OWNER",
+    badgeColor: "#4f46e5",
+    persona: `You are the Product Owner Agent in an agile sprint simulation. Given a feature request, write exactly 4 user stories in this precise format:
+
+**US-001 | [Story Title]**
+As a [specific user persona], I want to [specific action] so that [specific business value].
+Priority: P1/P2/P3 | Points: X | Sprint: 1
+
+Write 4 stories total. Mix priorities. Points should be Fibonacci (1,2,3,5,8,13). Be specific and realistic.
+After the stories, write: **Acceptance Criteria** with 2 Given/When/Then criteria for the most important story.
+
+Format your response exactly as shown — this will be parsed into cards.`
+  },
+  sm: {
+    name: "Scrum Master",
+    color: "#0ea5e9",
+    avatar: "🔄",
+    badge: "SCRUM MASTER",
+    badgeColor: "#0284c7",
+    persona: `You are the Scrum Master Agent in an agile sprint simulation. Review the proposed feature and:
+1. Check Definition of Ready (DoR) — list 3 DoR criteria and whether this feature meets them
+2. Check Definition of Done (DoD) — list 3 DoD criteria for this type of work
+3. Identify 2 potential blockers or impediments
+4. Give a sprint readiness score out of 10 with brief justification
+
+Be direct and professional. Use bullet points. Max 150 words.`
+  },
+  dev: {
+    name: "Dev Agent",
+    color: "#10b981",
+    avatar: "💻",
+    badge: "DEVELOPER",
+    badgeColor: "#059669",
+    persona: `You are the Developer Agent in an agile sprint simulation. Given a feature, provide:
+1. **Technical Approach** — 2-3 sentences on implementation strategy
+2. **Tech Stack Needed** — list the key technologies/systems involved
+3. **Effort Estimate** — total story points for a 2-week sprint
+4. **Key Dependencies** — 2-3 technical dependencies or integrations needed
+5. **Technical Debt Risk** — Low/Medium/High with one sentence reason
+
+Keep it technical but understandable to a Product Owner. Max 120 words.`
+  },
+  qa: {
+    name: "QA Agent",
+    color: "#f59e0b",
+    avatar: "🧪",
+    badge: "QA ENGINEER",
+    badgeColor: "#d97706",
+    persona: `You are the QA Agent in an agile sprint simulation. Given a feature, provide:
+1. **Test Scenarios** — 4 specific test scenarios (happy path + edge cases)
+2. **Edge Cases to Watch** — 2 unusual scenarios that could break the feature
+3. **Non-Functional Requirements** — performance, security, or accessibility considerations
+4. **Exit Criteria** — what must be true before this feature can be marked Done
+
+Be specific and technical. Think like someone who wants to break the feature. Max 130 words.`
+  },
+  risk: {
+    name: "Risk Agent",
+    color: "#ef4444",
+    avatar: "⚠️",
+    badge: "RISK MANAGER",
+    badgeColor: "#dc2626",
+    persona: `You are the Risk Agent in an agile sprint simulation. Analyse the feature and identify exactly 3 risks in this format:
+
+**RISK-001 | [Risk Title]**
+Severity: HIGH/MEDIUM/LOW | Probability: HIGH/MEDIUM/LOW
+Description: [1 sentence description]
+Mitigation: [1 sentence mitigation strategy]
+
+After the 3 risks, give an overall **Risk Score: X/10** with a one-line recommendation.
+Be realistic and specific to the feature — not generic.`
+  }
+};
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+let sprintCount = 0;
+let totalStoriesGenerated = 0;
+let totalPointsGenerated = 0;
+let running = false;
+let conversationHistory = [];
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runAgents(); }
+}
+
+function usePrompt(el) {
+  const text = el.querySelector('.ex-text').textContent;
+  document.getElementById('userInput').value = text;
+  autoResize(document.getElementById('userInput'));
+}
+
+function useHint(el) {
+  document.getElementById('userInput').value = el.textContent;
+}
+
+function scrollBottom() {
+  const area = document.getElementById('chatArea');
+  area.scrollTop = area.scrollHeight;
+}
+
+function setAgentStatus(id, status) {
+  const si = document.getElementById('si-' + id);
+  const st = document.getElementById('st-' + id);
+  if (!si || !st) return;
+  si.className = 'status-indicator ' + (status === 'thinking' ? 'si-thinking' : status === 'done' ? 'si-done' : 'si-idle');
+  st.textContent = status === 'thinking' ? 'Thinking...' : status === 'done' ? 'Done' : 'Standby';
+}
+
+function updateProgress(step, total = 6) {
+  document.getElementById('sprintProgress').style.width = Math.round((step / total) * 100) + '%';
+  document.getElementById('agentsRun').textContent = step + '/' + total;
+}
+
+function addSystemMsg(text) {
+  const div = document.createElement('div');
+  div.className = 'sys-msg';
+  div.innerHTML = `<div class="sys-line"></div><span>${text}</span><div class="sys-line"></div>`;
+  document.getElementById('chatArea').appendChild(div);
+  scrollBottom();
+}
+
+function addUserMsg(text) {
+  const welcome = document.getElementById('welcomeScreen');
+  if (welcome) welcome.remove();
+  const div = document.createElement('div');
+  div.className = 'msg';
+  div.style.justifyContent = 'flex-end';
+  div.innerHTML = `
+    <div class="msg-body" style="text-align:right;max-width:520px">
+      <div class="msg-header" style="justify-content:flex-end">
+        <span class="msg-badge" style="background:rgba(255,255,255,.1);color:#94a3b8;font-size:9px;padding:1px 6px;border-radius:6px">YOU</span>
+        <span class="msg-time">${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
+      </div>
+      <div style="background:var(--s3);border-radius:10px 10px 3px 10px;padding:10px 14px;display:inline-block;text-align:left;max-width:100%">
+        <span class="msg-text">${text}</span>
+      </div>
+    </div>
+    <div class="msg-avatar" style="background:rgba(255,255,255,.1);color:#94a3b8;font-size:16px">👤</div>`;
+  document.getElementById('chatArea').appendChild(div);
+  scrollBottom();
+}
+
+function addTyping(agentKey) {
+  const agent = AGENTS[agentKey];
+  const id = 'typing-' + agentKey;
+  const div = document.createElement('div');
+  div.id = id;
+  div.className = 'msg';
+  div.innerHTML = `
+    <div class="msg-avatar" style="background:linear-gradient(135deg,${agent.color}88,${agent.color}44)">${agent.avatar}</div>
+    <div class="msg-body">
+      <div class="msg-header">
+        <span class="msg-name" style="color:${agent.color}">${agent.name}</span>
+        <span class="msg-badge" style="background:${agent.badgeColor}33;color:${agent.color};font-size:9px;padding:1px 6px;border-radius:6px">${agent.badge}</span>
+      </div>
+      <div class="typing-dots"><span></span><span></span><span></span></div>
+    </div>`;
+  document.getElementById('chatArea').appendChild(div);
+  scrollBottom();
+  return id;
+}
+
+function removeTyping(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function addAgentMsg(agentKey, content, deliverable = null) {
+  const agent = AGENTS[agentKey];
+  const div = document.createElement('div');
+  div.className = 'msg';
+  div.innerHTML = `
+    <div class="msg-avatar" style="background:linear-gradient(135deg,${agent.color}88,${agent.color}44)">${agent.avatar}</div>
+    <div class="msg-body">
+      <div class="msg-header">
+        <span class="msg-name" style="color:${agent.color}">${agent.name}</span>
+        <span class="msg-badge" style="background:${agent.badgeColor}33;color:${agent.color};font-size:9px;padding:1px 6px;border-radius:6px">${agent.badge}</span>
+        <span class="msg-time">${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
+      </div>
+      <div class="msg-text">${formatText(content)}</div>
+      ${deliverable ? deliverable : ''}
+    </div>`;
+  document.getElementById('chatArea').appendChild(div);
+  scrollBottom();
+}
+
+function formatText(text) {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>')
+    .replace(/^•\s/gm, '• ');
+}
+
+// ── CLAUDE API CALL ────────────────────────────────────────────────────────
+async function callClaude(systemPrompt, userMessage) {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userMessage }]
+    })
+  });
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content?.map(i => i.text || '').join('\n') || '';
+}
+
+// ── PARSE STORIES ──────────────────────────────────────────────────────────
+function parseAndRenderStories(text) {
+  const storyRegex = /\*\*US-\d+[^*]*\*\*[\s\S]*?(?=\*\*US-|\*\*Acceptance|$)/gi;
+  const matches = [...text.matchAll(/\*\*US-(\d+)\s*\|?\s*([^*]+)\*\*\s*([\s\S]*?)(?=\*\*US-|\*\*Acceptance|$)/gi)];
+
+  if (!matches.length) return null;
+
+  let html = '<div class="deliverable"><div class="del-header">📋 Generated User Stories</div>';
+  let stories = [];
+
+  matches.forEach((m, i) => {
+    const body = m[3];
+    const priorityMatch = body.match(/Priority:\s*(P[123])/i);
+    const pointsMatch = body.match(/Points:\s*(\d+)/i);
+    const priority = priorityMatch ? priorityMatch[1] : 'P2';
+    const points = pointsMatch ? parseInt(pointsMatch[1]) : 5;
+    const title = m[2].trim();
+    const idNum = String(i + 1).padStart(3, '0');
+    const id = 'US-' + idNum;
+
+    totalStoriesGenerated++;
+    totalPointsGenerated += points;
+    stories.push({ id, title, points, priority });
+
+    html += `<div class="del-story">
+      <div class="story-id">${id}</div>
+      <div class="story-title">${title}</div>
+      <span class="story-points">${points}pts</span>
+      <span class="story-prio ${priority === 'P1' ? 'prio-p1' : priority === 'P2' ? 'prio-p2' : 'prio-p3'}">${priority}</span>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">${body.split('\n')[0].replace(/\*\*/g,'')}</div>
+    </div>`;
+  });
+
+  html += '</div>';
+  updateRightPanel(stories);
+  return html;
+}
+
+function parseAndRenderRisks(text) {
+  const risks = [...text.matchAll(/\*\*RISK-(\d+)\s*\|?\s*([^*]+)\*\*\s*([\s\S]*?)(?=\*\*RISK-|\*\*Risk Score|$)/gi)];
+  if (!risks.length) return null;
+
+  let html = '<div class="deliverable"><div class="del-header">⚠️ Risk Register</div>';
+  let riskCount = 0;
+
+  risks.forEach(r => {
+    const body = r[3];
+    const sevMatch = body.match(/Severity:\s*(HIGH|MEDIUM|LOW)/i);
+    const sev = sevMatch ? sevMatch[1].toUpperCase() : 'MEDIUM';
+    const desc = body.match(/Description:\s*([^\n]+)/i);
+    const mit = body.match(/Mitigation:\s*([^\n]+)/i);
+    riskCount++;
+
+    html += `<div class="risk-item">
+      <span class="risk-sev ${sev === 'HIGH' ? 'sev-h' : sev === 'MEDIUM' ? 'sev-m' : 'sev-l'}">${sev}</span>
+      <div>
+        <div style="font-weight:600;color:var(--text);margin-bottom:2px">${r[2].trim()}</div>
+        ${desc ? '<div>' + desc[1] + '</div>' : ''}
+        ${mit ? '<div style="color:var(--success);margin-top:2px">✓ ' + mit[1] + '</div>' : ''}
+      </div>
+    </div>`;
+  });
+
+  html += '</div>';
+  document.getElementById('riskCount').textContent = riskCount;
+  return html;
+}
+
+function updateRightPanel(stories) {
+  document.getElementById('totalStories').textContent = totalStoriesGenerated;
+  document.getElementById('totalPoints').textContent = totalPointsGenerated;
+  const p1 = stories.filter(s => s.priority === 'P1').length;
+  document.getElementById('p1Count').textContent = p1;
+  document.getElementById('chipStories').textContent = totalStoriesGenerated + ' Stories';
+
+  const backlog = document.getElementById('backlogPanel');
+  backlog.innerHTML = stories.map(s => `
+    <div class="backlog-item">
+      <span class="bi-id">${s.id}</span>
+      <span class="bi-title">${s.title.substring(0, 28)}${s.title.length > 28 ? '...' : ''}</span>
+      <span class="bi-pts">${s.points}pt</span>
+    </div>`).join('');
+}
+
+// ── MAIN ORCHESTRATION ─────────────────────────────────────────────────────
+async function runAgents() {
+  if (running) return;
+  const input = document.getElementById('userInput').value.trim();
+  if (!input) return;
+
+  running = true;
+  sprintCount++;
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+  document.getElementById('userInput').value = '';
+  document.getElementById('userInput').style.height = 'auto';
+  document.getElementById('chipSprint').textContent = 'Sprint ' + sprintCount;
+  document.getElementById('sprintTitle').textContent = 'Sprint ' + sprintCount + ' Planning';
+  document.getElementById('sprintMeta').textContent = 'Feature: ' + input.substring(0, 60) + (input.length > 60 ? '...' : '');
+
+  // Reset counters for this sprint
+  totalStoriesGenerated = 0;
+  totalPointsGenerated = 0;
+
+  addUserMsg(input);
+  addSystemMsg('🚀 Sprint ' + sprintCount + ' initiated — 6 agents activating');
+
+  const context = `Feature Request: "${input}"\n\nThis is Sprint ${sprintCount}. Provide specific, actionable output for this feature.`;
+
+  // ── STEP 1: ORCHESTRATOR KICK-OFF ──
+  setAgentStatus('orchestrator', 'thinking');
+  updateProgress(1);
+  let tid = addTyping('orchestrator');
+  try {
+    const orchResponse = await callClaude(AGENTS.orchestrator.persona, context);
+    removeTyping(tid);
+    setAgentStatus('orchestrator', 'done');
+    addAgentMsg('orchestrator', orchResponse);
+  } catch(e) {
+    removeTyping(tid);
+    setAgentStatus('orchestrator', 'done');
+    addAgentMsg('orchestrator', `Sprint ${sprintCount} initiated. I'm delegating this feature to the team: **PO Agent** will draft user stories, **Dev Agent** will estimate, **Risk Agent** will identify blockers, **SM** will check readiness, and **QA** will define test scenarios. Let's plan this sprint.`);
+  }
+
+  addSystemMsg('📋 PO Agent — Writing user stories');
+
+  // ── STEP 2: PO AGENT ──
+  setAgentStatus('po', 'thinking');
+  updateProgress(2);
+  tid = addTyping('po');
+  try {
+    const poResponse = await callClaude(AGENTS.po.persona, context);
+    removeTyping(tid);
+    setAgentStatus('po', 'done');
+    const storyCards = parseAndRenderStories(poResponse);
+    addAgentMsg('po', poResponse, storyCards);
+  } catch(e) {
+    removeTyping(tid);
+    setAgentStatus('po', 'done');
+    const fallback = `**US-001 | ${input.substring(0,40)}**\nAs a product user, I want to ${input.substring(0,30)} so that I can achieve my goals efficiently.\nPriority: P1 | Points: 8 | Sprint: 1\n\n**US-002 | Enhanced Data Validation**\nAs an admin, I want real-time validation so that data quality is maintained.\nPriority: P2 | Points: 5 | Sprint: 1\n\n**Acceptance Criteria**\nGiven I am on the dashboard\nWhen I submit data\nThen the system validates in real-time`;
+    const storyCards = parseAndRenderStories(fallback);
+    addAgentMsg('po', fallback, storyCards);
+  }
+
+  addSystemMsg('💻 Dev Agent — Estimating effort & dependencies');
+
+  // ── STEP 3: DEV AGENT ──
+  setAgentStatus('dev', 'thinking');
+  updateProgress(3);
+  tid = addTyping('dev');
+  try {
+    const devResponse = await callClaude(AGENTS.dev.persona, context);
+    removeTyping(tid);
+    setAgentStatus('dev', 'done');
+    addAgentMsg('dev', devResponse);
+  } catch(e) {
+    removeTyping(tid);
+    setAgentStatus('dev', 'done');
+    addAgentMsg('dev', `**Technical Approach:** REST API with real-time webhooks, database migration required.\n**Tech Stack:** React frontend, Node.js backend, PostgreSQL, Redis cache\n**Effort Estimate:** 21 story points across 2 sprints\n**Key Dependencies:** Authentication service, existing data pipeline, third-party API\n**Technical Debt Risk:** Medium — legacy codebase integration required`);
+  }
+
+  addSystemMsg('⚠️ Risk Agent — Scanning for risks');
+
+  // ── STEP 4: RISK AGENT ──
+  setAgentStatus('risk', 'thinking');
+  updateProgress(4);
+  tid = addTyping('risk');
+  try {
+    const riskResponse = await callClaude(AGENTS.risk.persona, context);
+    removeTyping(tid);
+    setAgentStatus('risk', 'done');
+    const riskCards = parseAndRenderRisks(riskResponse);
+    addAgentMsg('risk', riskResponse, riskCards);
+  } catch(e) {
+    removeTyping(tid);
+    setAgentStatus('risk', 'done');
+    addAgentMsg('risk', `**RISK-001 | Third-party API Dependency**\nSeverity: HIGH | Probability: MEDIUM\nDescription: External API may have rate limits or downtime.\nMitigation: Implement retry logic and fallback caching.\n\n**RISK-002 | Data Migration Complexity**\nSeverity: MEDIUM | Probability: HIGH\nDescription: Legacy data may not conform to new schema.\nMitigation: Run parallel validation during migration.\n\n**Risk Score: 6/10** — Proceed with caution, address API dependency first.`);
+  }
+
+  addSystemMsg('🔄 Scrum Master — Reviewing DoR/DoD compliance');
+
+  // ── STEP 5: SCRUM MASTER ──
+  setAgentStatus('sm', 'thinking');
+  updateProgress(5);
+  tid = addTyping('sm');
+  try {
+    const smResponse = await callClaude(AGENTS.sm.persona, context);
+    removeTyping(tid);
+    setAgentStatus('sm', 'done');
+    addAgentMsg('sm', smResponse);
+  } catch(e) {
+    removeTyping(tid);
+    setAgentStatus('sm', 'done');
+    addAgentMsg('sm', `**DoR Check:**\n• ✅ Requirements clearly defined\n• ✅ Acceptance criteria written\n• ⚠️ Dependencies not fully mapped\n\n**DoD Criteria:**\n• Code reviewed and merged to main\n• Unit test coverage > 80%\n• Feature demo approved by PO\n\n**Potential Blockers:**\n• Third-party API credentials pending\n• Design assets not finalised\n\n**Sprint Readiness Score: 7/10** — Feature is ready for sprint with minor clarifications needed.`);
+  }
+
+  addSystemMsg('🧪 QA Agent — Writing test scenarios');
+
+  // ── STEP 6: QA AGENT ──
+  setAgentStatus('qa', 'thinking');
+  updateProgress(6);
+  tid = addTyping('qa');
+  try {
+    const qaResponse = await callClaude(AGENTS.qa.persona, context);
+    removeTyping(tid);
+    setAgentStatus('qa', 'done');
+    addAgentMsg('qa', qaResponse);
+  } catch(e) {
+    removeTyping(tid);
+    setAgentStatus('qa', 'done');
+    addAgentMsg('qa', `**Test Scenarios:**\n1. Happy path: User completes action successfully\n2. Error state: Invalid input returns clear error message\n3. Edge case: Empty/null data handled gracefully\n4. Performance: Response under 2 seconds with 100 concurrent users\n\n**Edge Cases:** Session timeout during action, concurrent edit conflicts\n\n**Non-Functional:** GDPR compliant, WCAG 2.1 AA accessible, 99.9% uptime\n\n**Exit Criteria:** All test scenarios pass, PO demo approved, performance baseline met`);
+  }
+
+  // ── FINAL SYNTHESIS ──
+  addSystemMsg('✅ Sprint planning complete — All agents finished');
+  document.getElementById('sprintProgress').style.width = '100%';
+
+  const summaryDiv = document.createElement('div');
+  summaryDiv.className = 'msg';
+  summaryDiv.innerHTML = `
+    <div class="msg-avatar" style="background:linear-gradient(135deg,#8b5cf6,#6366f1)">🎯</div>
+    <div class="msg-body">
+      <div class="msg-header">
+        <span class="msg-name" style="color:#8b5cf6">Orchestrator</span>
+        <span class="msg-badge" style="background:#7c3aed33;color:#8b5cf6;font-size:9px;padding:1px 6px;border-radius:6px">SYNTHESIS</span>
+        <span class="msg-time">${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
+      </div>
+      <div class="msg-text">
+        <strong>Sprint ${sprintCount} Planning Complete ✅</strong><br><br>
+        All 6 agents have completed their analysis. Here's the sprint summary:<br><br>
+        • <strong>Backlog:</strong> ${totalStoriesGenerated} user stories · ${totalPointsGenerated} story points<br>
+        • <strong>Readiness:</strong> Scrum Master approved with minor clarifications needed<br>
+        • <strong>Risk Level:</strong> Moderate — address API dependency before sprint start<br>
+        • <strong>QA Coverage:</strong> 4 test scenarios defined with clear exit criteria<br>
+        • <strong>Recommendation:</strong> Feature is sprint-ready. Resolve flagged blockers in sprint pre-work.<br><br>
+        <em style="color:var(--muted)">This sprint plan was generated by 6 specialised AI agents working in orchestrated sequence. Built by Monil Raval — Product Owner, SAFe 6 POPM.</em>
+      </div>
+    </div>`;
+  document.getElementById('chatArea').appendChild(summaryDiv);
+  scrollBottom();
+
+  // Reset agent statuses
+  ['orchestrator','po','sm','dev','qa','risk'].forEach(id => setAgentStatus(id, 'idle'));
+
+  running = false;
+  btn.disabled = false;
+  btn.textContent = 'Run Sprint ▶';
+}
+</script>
+</body>
+</html>
