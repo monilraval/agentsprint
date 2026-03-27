@@ -2,7 +2,7 @@
 
 > **Built by Monil Raval** — Certified SAFe 6 POPM | Product Owner | Ex-AGCO/Fendt, Bosch | MBA Germany
 
-[![Live Demo](https://img.shields.io/badge/🚀%20Live%20Demo-Try%20AgentSprint-6366f1?style=for-the-badge)](https://monilraval.github.io/agentsprint)
+[![Live Demo](https://img.shields.io/badge/🚀%20Live%20Demo-Try%20AgentSprint-6366f1?style=for-the-badge)](https://monilraval.github.io/agentsprint/as_index.html)
 [![Multi-Agent](https://img.shields.io/badge/Multi--Agent-6%20AI%20Agents-8b5cf6?style=for-the-badge)]()
 [![Powered by Claude](https://img.shields.io/badge/Powered%20by-Claude%20Sonnet-0ea5e9?style=for-the-badge)](https://anthropic.com)
 [![SAFe 6](https://img.shields.io/badge/SAFe%206-POPM%20Certified-10b981?style=for-the-badge)]()
@@ -64,7 +64,7 @@ User Input
 
 ## 🚀 Live Demo
 
-**[→ Open AgentSprint](https://monilraval.github.io/agentsprint)**
+**[→ Open AgentSprint](https://monilraval.github.io/agentsprint/as_index.html)**
 
 Try it with one of these prompts:
 - *"Build a real-time PIM data quality dashboard for product managers to monitor and fix data errors across 4 global brands"*
