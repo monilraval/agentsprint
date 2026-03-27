@@ -12,7 +12,7 @@
 
 ## 🎯 What Is AgentSprint?
 
-**AgentSprint** is the world's first multi-agent AI system purpose-built for **Agile Sprint Planning**. Describe a feature or product challenge, and 6 specialised AI agents — each with their own persona, expertise, and system prompt — collaborate in real time to produce a complete, sprint-ready backlog.
+**AgentSprint** is one of the first multi-agent AI systems purpose-built for **Agile Sprint Planning**. Describe a feature or product challenge, and 6 specialised AI agents — each with their own persona, expertise, and system prompt — collaborate in real time to produce a complete, sprint-ready backlog.
 
 **No other tool does this.** Existing AI tools for product management generate user stories in isolation. AgentSprint simulates an *entire agile team* debating, estimating, risk-scoring, and reviewing — just like a real PI Planning session.
 
